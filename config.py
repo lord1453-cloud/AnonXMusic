@@ -18,7 +18,7 @@ class Config:
         self.QUEUE_LIMIT = int(getenv("QUEUE_LIMIT", 20))
         self.PLAYLIST_LIMIT = int(getenv("PLAYLIST_LIMIT", 20))
 
-        self.SESSION1 = getenv("SESSION", "BQId0poAJdQSX1nkFFaAZVQ-9bX7YetH7b4LjQy-k0qaYRIdx2DwkisD9FhOpuE-wUSnOR6FgP05Fn7jFR_GRDkom41x57goSoJGwT5RkdyJkRTJDejOFP93nMD6GEi0TlJrsKMEbqPP0YWfWGozQ8TDofAbJuou1W2oNaMFT4IMkj1T55B0A7ydMKI_50MJ8d2gR55I_QgmzAASfYpMAjfILfTTEf0crYveHhyg7fGB518Rm5YX_KjncIUdPGGVvADqus8G1XGm8vTRduuW4KQtYC5yM9APYyOGTXlr00Y3fbYHBDB8Im8ixhkPoYCwN-6Yc3z6IgAL_VWP4-2fSnA7VAy9MwAAAAIVDvDRAA")
+        self.SESSION1 = getenv("SESSION", "BQId0poATVI9c2MJ0x_OtMuQoEyl4d2nF7FLydYNz46ghS9RdrKDHe39BNY3tlIlv9rX1THDLkQ6QkPlEYUaF4SNX8X-gI0AD1YyWZOHXX_Lhloy9ERHv9QHlGT62vUgtM-6Ogq1OSyDcZxE12yF3iqJ-R2x_oR1atZp1fWtorBMK1aYsHyESNlsCdakbBoSE4YHIqVtXKBkQqmpSYeyFga1yUBbdiFljcv9-llaGAbfJbfZzRBKEzCu-DcdPXfAOG5HG7YSoS5XwLW8-DDpKj5HFbU1P2vheJq71M6XSXgKerqANffsAfcuwVCr8b-p6hm6qSbL86wQLdSxyTrK0x6mg11chwAAAAIVDvDRAA")
         self.SESSION2 = getenv("SESSION2", None)
         self.SESSION3 = getenv("SESSION3", None)
 
@@ -33,7 +33,7 @@ class Config:
 
         self.LANG_CODE = getenv("LANG_CODE", "tr")
 
-        self.COOKIES_URL = ["https://batbin.me/fetishmonger"]
+        self.COOKIES_URL = []
         self.DEFAULT_THUMB = getenv("DEFAULT_THUMB", "https://te.legra.ph/file/3e40a408286d4eda24191.jpg")
         self.PING_IMG = getenv("PING_IMG", "https://files.catbox.moe/haagg2.png")
         self.START_IMG = getenv("START_IMG", "https://files.catbox.moe/zvziwk.jpg")
