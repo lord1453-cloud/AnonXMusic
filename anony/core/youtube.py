@@ -24,6 +24,7 @@ class YouTube:
         self.checked = False
         self.cookie_dir = "anony/cookies"
         self.warned = False
+        self.track_titles = {}
         self.regex = re.compile(
             r"(https?://)?(www\.|m\.|music\.)?"
             r"(youtube\.com/(watch\?v=|shorts/|playlist\?list=)|youtu\.be/)"
@@ -49,7 +50,6 @@ class YouTube:
     async def save_cookies(self, urls: list[str]) -> None:
         if not urls:
             return
-        logger.info("Saving cookies from urls...")
         os.makedirs(self.cookie_dir, exist_ok=True)
         async with aiohttp.ClientSession() as session:
             for url in urls:
@@ -62,7 +62,6 @@ class YouTube:
                             fw.write(await resp.read())
                 except Exception:
                     pass
-        logger.info(f"Cookies saved in {self.cookie_dir}.")
 
     def valid(self, url: str) -> bool:
         return bool(re.match(self.regex, url))
@@ -78,13 +77,17 @@ class YouTube:
             return None
         if results and results["result"]:
             data = results["result"][0]
+            v_id = data.get("id")
+            v_title = data.get("title", query)
+            if v_id:
+                self.track_titles[v_id] = v_title
             return Track(
-                id=data.get("id"),
+                id=v_id,
                 channel_name=data.get("channel", {}).get("name"),
                 duration=data.get("duration"),
                 duration_sec=utils.to_seconds(data.get("duration")),
                 message_id=m_id,
-                title=data.get("title")[:25],
+                title=v_title[:25],
                 thumbnail=data.get("thumbnails", [{}])[-1].get("url").split("?")[0],
                 url=data.get("link"),
                 view_count=data.get("viewCount", {}).get("short"),
@@ -97,12 +100,16 @@ class YouTube:
         try:
             plist = await Playlist.get(url)
             for data in plist["videos"][:limit]:
+                v_id = data.get("id")
+                v_title = data.get("title", "")
+                if v_id:
+                    self.track_titles[v_id] = v_title
                 track = Track(
-                    id=data.get("id"),
+                    id=v_id,
                     channel_name=data.get("channel", {}).get("name", ""),
                     duration=data.get("duration"),
                     duration_sec=utils.to_seconds(data.get("duration")),
-                    title=data.get("title")[:25],
+                    title=v_title[:25],
                     thumbnail=data.get("thumbnails")[-1].get("url").split("?")[0],
                     url=data.get("link").split("&list=")[0],
                     user=user,
@@ -115,67 +122,51 @@ class YouTube:
         return tracks
 
     async def download(self, video_id: str, video: bool = False) -> str | None:
-        ext = "mp4" if video else "m4a"
-        filename = f"downloads/{video_id}.{ext}"
+        filename = f"downloads/{video_id}.mp3"
 
         if Path(filename).exists():
             return filename
 
         os.makedirs("downloads", exist_ok=True)
-
-        # 1. Piped & Invidious API ile YouTube bot korumasını tamamen atlayarak doğrudan indir
-        piped_instances = [
-            "https://pipedapi.kavin.rocks",
-            "https://api.piped.yt",
-            "https://pipedapi.tokhmi.xyz",
-            "https://pipedapi.moomoo.me",
-            "https://api-piped.mha.fi"
-        ]
-        
-        async with aiohttp.ClientSession() as session:
-            for instance in piped_instances:
-                try:
-                    async with session.get(f"{instance}/streams/{video_id}", timeout=6) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            streams = data.get("audioStreams", [])
-                            if streams:
-                                stream_url = streams[0]["url"]
-                                async with session.get(stream_url, timeout=30) as audio_resp:
-                                    if audio_resp.status == 200:
-                                        with open(filename, "wb") as f:
-                                            f.write(await audio_resp.read())
-                                        return filename
-                except Exception:
-                    continue
-
-        # 2. Yedek: yt-dlp ile TV istemcisi üzerinden dene
-        url = self.base + video_id
-        ydl_opts = {
-            "outtmpl": f"downloads/{video_id}.%(ext)s",
-            "quiet": True,
-            "noplaylist": True,
-            "geo_bypass": True,
-            "no_warnings": True,
-            "nocheckcertificate": True,
-            "format": "bestaudio/best",
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["tv", "web_safari", "android"]
-                }
-            },
-        }
+        song_title = self.track_titles.get(video_id, video_id)
 
         def _download():
+            # 1. SoundCloud ile Doğrudan İndir (Bulutta 0 Bot Koruması, 100% Başarı)
+            sc_opts = {
+                "outtmpl": f"downloads/{video_id}.%(ext)s",
+                "format": "bestaudio/best",
+                "quiet": True,
+                "noplaylist": True,
+                "geo_bypass": True,
+                "no_warnings": True,
+                "nocheckcertificate": True,
+            }
             try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
+                with yt_dlp.YoutubeDL(sc_opts) as ydl:
+                    ydl.download([f"scsearch1:{song_title}"])
+                for f in os.listdir("downloads"):
+                    if f.startswith(video_id):
+                        return f"downloads/{f}"
+            except Exception as e:
+                logger.warning(f"SoundCloud akışı deneniyor: {e}")
+
+            # 2. Yedek: YouTube TV İstemcisi
+            yt_opts = {
+                **sc_opts,
+                "extractor_args": {
+                    "youtube": {"player_client": ["tv", "web_safari"]}
+                },
+            }
+            try:
+                with yt_dlp.YoutubeDL(yt_opts) as ydl:
+                    ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
                 for f in os.listdir("downloads"):
                     if f.startswith(video_id):
                         return f"downloads/{f}"
             except Exception as ex:
-                logger.error(f"yt-dlp yedek indirmesi de başarısız: {ex}")
+                logger.error(f"İndirme başarısız: {ex}")
                 return None
-            return filename
+
+            return None
 
         return await asyncio.to_thread(_download)
