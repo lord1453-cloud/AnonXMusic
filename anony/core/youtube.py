@@ -135,7 +135,7 @@ class YouTube:
             "cookiefile": cookie,
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["android", "web_embedded", "web", "mweb", "ios"]
+                    "player_client": ["web_safari", "android", "mweb"]
                 }
             },
         }
