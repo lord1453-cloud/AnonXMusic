@@ -115,65 +115,67 @@ class YouTube:
         return tracks
 
     async def download(self, video_id: str, video: bool = False) -> str | None:
-        url = self.base + video_id
-        ext = "mp4" if video else "webm"
+        ext = "mp4" if video else "m4a"
         filename = f"downloads/{video_id}.{ext}"
 
         if Path(filename).exists():
             return filename
 
         os.makedirs("downloads", exist_ok=True)
-        cookie = self.get_cookies()
-        base_opts = {
+
+        # 1. Piped & Invidious API ile YouTube bot korumasını tamamen atlayarak doğrudan indir
+        piped_instances = [
+            "https://pipedapi.kavin.rocks",
+            "https://api.piped.yt",
+            "https://pipedapi.tokhmi.xyz",
+            "https://pipedapi.moomoo.me",
+            "https://api-piped.mha.fi"
+        ]
+        
+        async with aiohttp.ClientSession() as session:
+            for instance in piped_instances:
+                try:
+                    async with session.get(f"{instance}/streams/{video_id}", timeout=6) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            streams = data.get("audioStreams", [])
+                            if streams:
+                                stream_url = streams[0]["url"]
+                                async with session.get(stream_url, timeout=30) as audio_resp:
+                                    if audio_resp.status == 200:
+                                        with open(filename, "wb") as f:
+                                            f.write(await audio_resp.read())
+                                        return filename
+                except Exception:
+                    continue
+
+        # 2. Yedek: yt-dlp ile TV istemcisi üzerinden dene
+        url = self.base + video_id
+        ydl_opts = {
             "outtmpl": f"downloads/{video_id}.%(ext)s",
             "quiet": True,
             "noplaylist": True,
             "geo_bypass": True,
             "no_warnings": True,
-            "overwrites": False,
             "nocheckcertificate": True,
-            "cookiefile": cookie,
+            "format": "bestaudio/best",
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["web_safari", "android", "mweb"]
+                    "player_client": ["tv", "web_safari", "android"]
                 }
             },
         }
 
-        ydl_opts = {
-            **base_opts,
-            "format": "bestaudio/best",
-        }
-
         def _download():
-            # 1. Önce YouTube'dan dene
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])
                 for f in os.listdir("downloads"):
                     if f.startswith(video_id):
                         return f"downloads/{f}"
-            except Exception as e:
-                logger.warning(f"YouTube indirmesi engellendi, SoundCloud yedeğine geçiliyor: {e}")
-
-            # 2. YouTube engellenirse SoundCloud / Alternatif akış üzerinden indir
-            try:
-                sc_opts = {
-                    "outtmpl": f"downloads/{video_id}.%(ext)s",
-                    "format": "bestaudio/best",
-                    "quiet": True,
-                    "noplaylist": True,
-                    "geo_bypass": True,
-                }
-                with yt_dlp.YoutubeDL(sc_opts) as sc_ydl:
-                    sc_ydl.download([f"scsearch:{video_id}"])
-                for f in os.listdir("downloads"):
-                    if f.startswith(video_id):
-                        return f"downloads/{f}"
             except Exception as ex:
-                logger.error(f"Tüm indirme yöntemleri başarısız oldu: {ex}")
+                logger.error(f"yt-dlp yedek indirmesi de başarısız: {ex}")
                 return None
-
             return filename
 
         return await asyncio.to_thread(_download)
