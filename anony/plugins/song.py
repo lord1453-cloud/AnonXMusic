@@ -56,7 +56,7 @@ async def song_downloader(client: Client, message: Message):
         if not os.path.exists(mp3_file):
             return await m.edit_text("❌ **İndirme sırasında bir hata oluştu.**")
             
-        await m.edit_text("📤 **Telegram'a müzik dosyası olarak yükleniyor...**")
+        await m.edit_text("📤 **Telegram sunucularına yükleniyor...**")
         
         await message.reply_audio(
             audio=mp3_file,
