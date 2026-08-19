@@ -125,7 +125,7 @@ class YouTube:
         os.makedirs("downloads", exist_ok=True)
         cookie = self.get_cookies()
         base_opts = {
-            "outtmpl": "downloads/%(id)s.%(ext)s",
+            "outtmpl": f"downloads/{video_id}.%(ext)s",
             "quiet": True,
             "noplaylist": True,
             "geo_bypass": True,
@@ -140,27 +140,40 @@ class YouTube:
             },
         }
 
-        if video:
-            ydl_opts = {
-                **base_opts,
-                "format": "(bestvideo[height<=?720][width<=?1280][ext=mp4])+(bestaudio/best)",
-                "merge_output_format": "mp4",
-            }
-        else:
-            ydl_opts = {
-                **base_opts,
-                "format": "bestaudio/best",
-            }
+        ydl_opts = {
+            **base_opts,
+            "format": "bestaudio/best",
+        }
 
         def _download():
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                try:
+            # 1. Önce YouTube'dan dene
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])
-                except (yt_dlp.utils.DownloadError, yt_dlp.utils.ExtractorError):
-                    return None
-                except Exception as ex:
-                    logger.warning("Download failed: %s", ex)
-                    return None
+                for f in os.listdir("downloads"):
+                    if f.startswith(video_id):
+                        return f"downloads/{f}"
+            except Exception as e:
+                logger.warning(f"YouTube indirmesi engellendi, SoundCloud yedeğine geçiliyor: {e}")
+
+            # 2. YouTube engellenirse SoundCloud / Alternatif akış üzerinden indir
+            try:
+                sc_opts = {
+                    "outtmpl": f"downloads/{video_id}.%(ext)s",
+                    "format": "bestaudio/best",
+                    "quiet": True,
+                    "noplaylist": True,
+                    "geo_bypass": True,
+                }
+                with yt_dlp.YoutubeDL(sc_opts) as sc_ydl:
+                    sc_ydl.download([f"scsearch:{video_id}"])
+                for f in os.listdir("downloads"):
+                    if f.startswith(video_id):
+                        return f"downloads/{f}"
+            except Exception as ex:
+                logger.error(f"Tüm indirme yöntemleri başarısız oldu: {ex}")
+                return None
+
             return filename
 
         return await asyncio.to_thread(_download)
