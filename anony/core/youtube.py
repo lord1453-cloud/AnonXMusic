@@ -122,50 +122,57 @@ class YouTube:
         return tracks
 
     async def download(self, video_id: str, video: bool = False) -> str | None:
-        filename = f"downloads/{video_id}.mp3"
-
-        if Path(filename).exists():
-            return filename
-
         os.makedirs("downloads", exist_ok=True)
-        song_title = self.track_titles.get(video_id, video_id)
+        song_title = self.track_titles.get(video_id, "")
+
+        for f in os.listdir("downloads"):
+            if f.startswith(video_id):
+                return os.path.join("downloads", f)
+
+        url = self.base + video_id
 
         def _download():
-            # 1. SoundCloud ile Doğrudan İndir (Bulutta 0 Bot Koruması, 100% Başarı)
-            sc_opts = {
-                "outtmpl": f"downloads/{video_id}.%(ext)s",
+            # 1. YouTube Android / Web-Embedded (Reload hatası vermez)
+            opts = {
                 "format": "bestaudio/best",
+                "outtmpl": f"downloads/{video_id}.%(ext)s",
                 "quiet": True,
-                "noplaylist": True,
-                "geo_bypass": True,
                 "no_warnings": True,
+                "geo_bypass": True,
                 "nocheckcertificate": True,
-            }
-            try:
-                with yt_dlp.YoutubeDL(sc_opts) as ydl:
-                    ydl.download([f"scsearch1:{song_title}"])
-                for f in os.listdir("downloads"):
-                    if f.startswith(video_id):
-                        return f"downloads/{f}"
-            except Exception as e:
-                logger.warning(f"SoundCloud akışı deneniyor: {e}")
-
-            # 2. Yedek: YouTube TV İstemcisi
-            yt_opts = {
-                **sc_opts,
                 "extractor_args": {
-                    "youtube": {"player_client": ["tv", "web_safari"]}
+                    "youtube": {
+                        "player_client": ["android", "web_embedded"]
+                    }
                 },
             }
             try:
-                with yt_dlp.YoutubeDL(yt_opts) as ydl:
-                    ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.download([url])
                 for f in os.listdir("downloads"):
                     if f.startswith(video_id):
-                        return f"downloads/{f}"
+                        return os.path.join("downloads", f)
             except Exception as ex:
-                logger.error(f"İndirme başarısız: {ex}")
-                return None
+                logger.warning("YouTube indirme hatası: %s", ex)
+
+            # 2. Yedek: SoundCloud
+            if song_title:
+                try:
+                    sc_opts = {
+                        "format": "bestaudio/best",
+                        "outtmpl": f"downloads/{video_id}.%(ext)s",
+                        "quiet": True,
+                        "no_warnings": True,
+                        "geo_bypass": True,
+                        "nocheckcertificate": True,
+                    }
+                    with yt_dlp.YoutubeDL(sc_opts) as ydl:
+                        ydl.download([f"scsearch1:{song_title}"])
+                    for f in os.listdir("downloads"):
+                        if f.startswith(video_id):
+                            return os.path.join("downloads", f)
+                except Exception as e:
+                    logger.warning("SoundCloud indirme hatası: %s", e)
 
             return None
 
