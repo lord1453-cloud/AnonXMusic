@@ -20,10 +20,7 @@ def playlist_to_queue(chat_id: int, tracks: list) -> str:
     text = text[:1948] + "</blockquote>"
     return text
 
-@app.on_message(
-    filters.command(["play", "playforce", "vplay", "vplayforce"])
-    & filters.group
-    & ~app.bl_users
+@app.on_message( filters.command(["play", "playforce", "vplay", "vplayforce", "oynat", "zorlaoynat", "voynat", "vzorlaoynat"]) & filters.group & ~app.bl_users )
 )
 @lang.language()
 @checkUB
